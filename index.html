@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Flashcard Study & Review</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #111111;
+      --accent: #4a4a4a;
+      --btn-bg: #f0f0f0;
+      --btn-hover: #e0e0e0;
+    }
+    [data-theme="dark"] {
+      --bg: #1a1a1a;
+      --fg: #eaeaea;
+      --accent: #cccccc;
+      --btn-bg: #333333;
+      --btn-hover: #444444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: 'Inter', sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+    .left, .center, .right {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .left { cursor: pointer; }
+    .left svg, .right svg {
+      width: 1.2rem;
+      height: 1.2rem;
+      fill: var(--accent);
+      cursor: pointer;
+    }
+    .center {
+      font-size: 0.9rem;
+      color: var(--accent);
+    }
+    main {
+      position: relative;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      text-align: center;
+    }
+    .category {
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+    }
+    #cardContainer {
+      cursor: pointer;
+    }
+    .question {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 2rem;
+      max-width: 80%;
+    }
+    .controls {
+      position: absolute;
+      top: 50%;
+      right: 1rem;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .controls button {
+      background: var(--btn-bg);
+      border: none;
+      padding: 0.5rem;
+      border-radius: 0.25rem;
+      font-size: 1rem;
+      cursor: pointer;
+      min-width: 2.5rem;
+    }
+    .controls button:hover {
+      background: var(--btn-hover);
+    }
+    .next {
+      position: absolute;
+      bottom: 2rem;
+      background: var(--btn-bg);
+      border: none;
+      border-radius: 50%;
+      width: 3rem;
+      height: 3rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .next svg {
+      width: 1.5rem;
+      height: 1.5rem;
+      fill: var(--accent);
+    }
+    @media screen and (max-width: 768px) {
+      .question { font-size: 1.25rem; }
+      .controls { top: auto; bottom: 5rem; right: 50%; transform: translateX(50%); flex-direction: row; }
+    }
+  </style>
+</head>
+<body data-theme="light">
+  <header>
+    <div class="left" id="toggleModeBtn">
+      <!-- Book icon -->
+      <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V5H6.5A2.5 2.5 0 0 0 4 7.5v12zM20 3H6.5A4.5 4.5 0 0 0 2 7.5v12A4.5 4.5 0 0 0 6.5 24H22V3H20z"/></svg>
+      <span id="modeText">STUDY</span>
+    </div>
+    <div class="center">1 of 10</div>
+    <div class="right">
+      <!-- Reload icon -->
+      <svg id="reloadBtn" viewBox="0 0 24 24"><path d="M17.65 6.35A8 8 0 1 0 12 4V1l-5 5 5 5V5a6 6 0 1 1 5.65 8.65z"/></svg>
+      <!-- Fullscreen icon -->
+      <svg id="fullscreenBtn" viewBox="0 0 24 24"><path d="M17 1H7C5.9 1 5 1.9 5 3v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-2-2-2zm0 18H7V3h10v16z"/></svg>
+      <!-- Theme toggle -->
+      <svg id="themeToggleBtn" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/></svg>
+    </div>
+  </header>
+
+  <main>
+    <div class="category"></div>
+    <div id="cardContainer">
+      <div class="question">Loading...</div>
+    </div>
+
+    <div class="controls">
+      <button>0</button>
+      <button>1</button>
+      <button>2</button>
+      <button>3</button>
+      <button>4</button>
+      <button>5</button>
+    </div>
+
+    <button class="next" id="nextBtn">
+      <svg viewBox="0 0 24 24"><path d="M12 4l1.41 1.41L8.83 10H20v2H8.83l4.58 4.59L12 18l-8-8z"/></svg>
+    </button>
+  </main>
+
+  <script>
+    // REPLACE with your published Apps Script URL
+    const API_BASE = 'https://script.google.com/macros/s/AKfycbyKDaB7cUC2IjCK8AtEXyXSwWOT8Y3MAiZbUzC6hW5evWyOaFafVB6vuAXYUIAU1YLYyA/exec';
+
+    let mode = 'study';
+    let deckName;
+    let cards = [];
+    let currentIndex = 0;
+
+    document.addEventListener('DOMContentLoaded', init);
+
+    function init() {
+      // determine deck from URL or default to first
+      const params = new URLSearchParams(window.location.search);
+      const urlDeck = params.get('deck');
+      if (urlDeck) {
+        deckName = urlDeck;
+        loadCards();
+      } else {
+        fetch(`${API_BASE}?action=getDecks`)
+          .then(r => r.json())
+          .then(data => {
+            if (data.success && data.decks.length) {
+              deckName = data.decks[0];
+              loadCards();
+            }
+          });
+      }
+
+      document.getElementById('toggleModeBtn').addEventListener('click', () => {
+        mode = mode === 'study' ? 'review' : 'study';
+        document.getElementById('modeText').textContent = mode.toUpperCase();
+        currentIndex = 0;
+        loadCards();
+      });
+      document.getElementById('reloadBtn').addEventListener('click', () => {
+        currentIndex = 0;
+        loadCards();
+      });
+      document.getElementById('themeToggleBtn').addEventListener('click', () => {
+        const html = document.documentElement;
+        html.dataset.theme = html.dataset.theme === 'light' ? 'dark' : 'light';
+      });
+      document.getElementById('fullscreenBtn').addEventListener('click', () => {
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+        else document.exitFullscreen();
+      });
+      document.getElementById('cardContainer').addEventListener('click', toggleCard);
+      document.querySelector('.controls').addEventListener('click', e => {
+        if (e.target.tagName === 'BUTTON' && mode === 'study') {
+          submitGrade(parseInt(e.target.textContent, 10));
+        }
+      });
+      document.getElementById('nextBtn').addEventListener('click', () => {
+        if (mode === 'review') showNext();
+      });
+    }
+
+    function loadCards() {
+      fetch(`${API_BASE}?action=getCards&mode=${mode}&deckName=${encodeURIComponent(deckName)}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            cards = data.cards;
+            currentIndex = 0;
+            render();
+          } else {
+            alert(data.error);
+          }
+        });
+    }
+
+    function render() {
+      const total = cards.length;
+      document.querySelector('.center').textContent = `${currentIndex + 1} of ${total}`;
+      if (!total) {
+        document.querySelector('.category').textContent = '';
+        document.querySelector('.question').textContent = 'No cards';
+        document.querySelector('.controls').style.display = mode === 'study' ? 'flex' : 'none';
+        document.getElementById('nextBtn').style.display = mode === 'review' ? 'block' : 'none';
+        return;
+      }
+      const card = cards[currentIndex];
+      document.querySelector('.category').textContent = deckName.toUpperCase();
+      document.querySelector('.question').textContent = card.question;
+      document.querySelector('.controls').style.display = mode === 'study' ? 'flex' : 'none';
+      document.getElementById('nextBtn').style.display = mode === 'review' ? 'block' : 'none';
+    }
+
+    function toggleCard() {
+      const q = document.querySelector('.question');
+      const card = cards[currentIndex];
+      q.textContent = q.textContent === card.question ? card.answer : card.question;
+    }
+
+    function submitGrade(grade) {
+      const card = cards[currentIndex];
+      fetch(API_BASE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `action=submitGrade&deckName=${encodeURIComponent(deckName)}&cardId=${encodeURIComponent(card.id)}&grade=${grade}`
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) showNext();
+        else alert(data.error);
+      });
+    }
+
+    function showNext() {
+      currentIndex = (currentIndex + 1) % cards.length;
+      render();
+    }
+  </script>
+</body>
+</html>
